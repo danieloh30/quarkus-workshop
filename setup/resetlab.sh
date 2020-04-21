@@ -12,9 +12,8 @@ if [ ! "$(oc get clusterrolebindings)" ] ; then
   exit 1
 fi
 
-oc delete project che
+oc delete project codeready
 oc delete project guides
-oc delete project app-monitoring
 
 # delete user projects
 for proj in $(oc get projects -l quarkus-workshop=true -o name|cut -d/ -f2) ; do

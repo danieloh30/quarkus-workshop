@@ -10,6 +10,8 @@ function usage() {
 # Defaults
 USERCOUNT=10
 ADMIN_PASSWORD=
+OPENSHIFT_USER_PASSWORD=openshift
+CHE_USER_PASSWORD=openshift
 
 POSITIONAL=()
 while [[ $# -gt 0 ]]
@@ -61,14 +63,14 @@ HOSTNAME_SUFFIX=$(echo $ROUTE | sed 's/^dummy-'${TMP_PROJ}'\.//g')
 oc delete project $TMP_PROJ
 MASTER_URL=$(oc whoami --show-server)
 CONSOLE_URL=$(oc whoami --show-console)
-# create users
 TMPHTPASS=$(mktemp)
-for i in {1..$USERCOUNT} ; do
-    htpasswd -b ${TMPHTPASS} "user$i" "pass$i"
-done
 
 # Add openshift cluster admin user
 htpasswd -b ${TMPHTPASS} admin "${ADMIN_PASSWORD}"
+# create users
+for i in $(eval echo "{1..$USERCOUNT}") ; do
+    htpasswd -b ${TMPHTPASS} "user$i" "${OPENSHIFT_USER_PASSWORD}"
+done
 
 # Create user secret in OpenShift
 ! oc -n openshift-config delete secret workshop-user-secret
@@ -82,17 +84,14 @@ oc -n openshift-config get oauth cluster -o yaml | \
   oc apply -f -
 
 # sleep for 30 seconds for the pods to be restarted
-echo "Wait for 30s for new OAuth to take effect"
+echo "Waiting 30s for new OAuth to take effect"
 sleep 30
 
 # Make the admin as cluster admin
 oc adm policy add-cluster-role-to-user cluster-admin admin
 
-# become admin
-oc login $MASTER_URL -u admin -p "${ADMIN_PASSWORD}" --insecure-skip-tls-verify
-
 # create projects for users
-for i in {1..$USERCOUNT} ; do
+for i in $(eval echo "{1..$USERCOUNT}") ; do
     PROJ="user${i}-project"
     oc new-project $PROJ --display-name="Working Project for user${i}" >&- && \
     oc label namespace $PROJ quarkus-workshop=true  && \
@@ -101,94 +100,77 @@ done
 
 # deploy guides
 oc new-project guides
-oc new-app quay.io/osevg/workshopper --name=web \
+oc new-app quay.io/jamesfalkner/workshopper --name=web \
       -e MASTER_URL=${MASTER_URL} \
       -e CONSOLE_URL=${CONSOLE_URL} \
-      -e CHE_URL=http://codeready-che.${HOSTNAME_SUFFIX} \
-      -e KEYCLOAK_URL=http://keycloak-che.${HOSTNAME_SUFFIX} \
+      -e CHE_URL=http://codeready-codeready.${HOSTNAME_SUFFIX} \
+      -e KEYCLOAK_URL=http://keycloak-codeready.${HOSTNAME_SUFFIX} \
       -e ROUTE_SUBDOMAIN=${HOSTNAME_SUFFIX} \
-      -e CONTENT_URL_PREFIX="https://raw.githubusercontent.com/RedHatWorkshops/quarkus-workshop/master/docs/" \
-      -e WORKSHOPS_URLS="https://raw.githubusercontent.com/RedHatWorkshops/quarkus-workshop/master/docs/_workshop.yml" \
-      -e CHE_USER_NAME=userNN \
-      -e CHE_USER_PASSWORD=passNN \
-      -e OPENSHIFT_USER_NAME=userNN \
-      -e OPENSHIFT_USER_PASSWORD=passNN \
+      -e CONTENT_URL_PREFIX="https://raw.githubusercontent.com/RedHatWorkshops/quarkus-workshop/ocp-4.3/docs/" \
+      -e WORKSHOPS_URLS="https://raw.githubusercontent.com/RedHatWorkshops/quarkus-workshop/ocp-4.3/docs/_workshop.yml" \
+      -e CHE_USER_PASSWORD=${CHE_USER_PASSWORD} \
+      -e OPENSHIFT_USER_PASSWORD=${OPENSHIFT_USER_PASSWORD} \
       -e LOG_TO_STDOUT=true
 oc expose svc/web
 
 # Install Che
-oc new-project che
-cat <<EOF | oc apply -n openshift-marketplace -f -
+oc new-project codeready
+cat <<EOF | oc apply -n codeready -f -
 apiVersion: operators.coreos.com/v1
-kind: CatalogSourceConfig
-metadata:
-  finalizers:
-  - finalizer.catalogsourceconfigs.operators.coreos.com
-  name: installed-redhat-che
-  namespace: openshift-marketplace
-spec:
-  targetNamespace: che
-  packages: codeready-workspaces
-  csDisplayName: Red Hat Operators
-  csPublisher: Red Hat
-EOF
-
-cat <<EOF | oc apply -n che -f -
-apiVersion: operators.coreos.com/v1alpha2
 kind: OperatorGroup
 metadata:
-  name: che-operator-group
-  namespace: che
-  generateName: che-
+  generateName: codeready-
   annotations:
     olm.providedAPIs: CheCluster.v1.org.eclipse.che
+  name: codeready-operator-group
+  namespace: codeready
 spec:
   targetNamespaces:
-  - che
+    - codeready
 EOF
 
-cat <<EOF | oc apply -n che -f -
+cat <<EOF | oc apply -n codeready -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
   name: codeready-workspaces
-  namespace: che
-  labels:
-    csc-owner-name: installed-redhat-che
-    csc-owner-namespace: openshift-marketplace
+  namespace: codeready
 spec:
-  channel: final
+  channel: latest
   installPlanApproval: Automatic
   name: codeready-workspaces
-  source: installed-redhat-che
-  sourceNamespace: che
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
 EOF
 
 # Wait for checluster to be a thing
 echo "Waiting for CheCluster CRDs"
 while [ true ] ; do
-  if [ "$(oc explain checluster)" ] ; then
+  if [ "$(oc explain checluster -n codeready)" ] ; then
     break
   fi
   echo -n .
   sleep 10
 done
 
-cat <<EOF | oc apply -n che -f -
+cat <<EOF | oc apply -n codeready -f -
 apiVersion: org.eclipse.che/v1
 kind: CheCluster
 metadata:
-  name: codeready
-  namespace: che
+  name: codeready-workspaces
+  namespace: codeready
 spec:
   server:
+    cheImageTag: ''
     cheFlavor: codeready
-    tlsSupport: false
+    devfileRegistryImage: ''
+    pluginRegistryImage: ''
+    tlsSupport: true
     selfSignedCert: false
     serverMemoryRequest: '2Gi'
     serverMemoryLimit: '6Gi'
-
-
+    customCheProperties:
+      CHE_LIMITS_WORKSPACE_IDLE_TIMEOUT: "0"
   database:
     externalDb: false
     chePostgresHostName: ''
@@ -198,10 +180,11 @@ spec:
     chePostgresDb: ''
   auth:
     openShiftoAuth: false
-    externalKeycloak: false
-    keycloakURL: ''
-    keycloakRealm: ''
-    keycloakClientId: ''
+    identityProviderImage: ''
+    externalIdentityProvider: false
+    identityProviderURL: ''
+    identityProviderRealm: ''
+    identityProviderClientId: ''
   storage:
     pvcStrategy: per-workspace
     pvcClaimSize: 1Gi
@@ -211,79 +194,75 @@ EOF
 # Wait for che to be up
 echo "Waiting for Che to come up..."
 while [ 1 ]; do
-  STAT=$(curl -s -w '%{http_code}' -o /dev/null http://codeready-che.${HOSTNAME_SUFFIX}/dashboard/)
+  STAT=$(curl -s -w '%{http_code}' -o /dev/null http://codeready-codeready.$HOSTNAME_SUFFIX/dashboard/)
   if [ "$STAT" = 200 ] ; then
     break
   fi
   echo -n .
   sleep 10
 done
-
-# workaround for PVC problem
-oc get --export cm/custom -n che -o yaml | yq w - 'data.CHE_INFRA_KUBERNETES_PVC_WAIT__BOUND' \"false\" | oc apply -f - -n che
-oc scale -n che deployment/codeready --replicas=0
-oc scale -n che deployment/codeready --replicas=1
-
-# Wait for che to be back up
-echo "Waiting for Che to come back up..."
-while [ 1 ]; do
-  STAT=$(curl -s -w '%{http_code}' -o /dev/null http://codeready-che.${HOSTNAME_SUFFIX}/dashboard/)
-  if [ "$STAT" = 200 ] ; then
-    break
-  fi
-  echo -n .
-  sleep 10
-done
-
-
-# workaround for Che Terminal timeouts
-# must be run from AWS bastion host
-
-# sudo -u ec2-user aws configure
-# Default region name [None]: us-east-1
-
-# get load balancer name
-# sudo -u ec2-user aws elb describe-load-balancers | jq  '.LoadBalancerDescriptions | map(select( .DNSName == "'$(oc get svc router-default -n openshift-ingress -o jsonpath='{.status.loadBalancer.ingress[].hostname}')'" ))' | grep LoadBalancerName
-
-# update timeout to 5 minutes
-# sudo -u ec2-user aws elb modify-load-balancer-attributes --load-balancer-name <name> --load-balancer-attributes "{\"ConnectionSettings\":{\"IdleTimeout\":300}}"
 
 # get keycloak admin password
 KEYCLOAK_USER="$(oc set env deployment/keycloak --list |grep SSO_ADMIN_USERNAME | cut -d= -f2)"
 KEYCLOAK_PASSWORD="$(oc set env deployment/keycloak --list |grep SSO_ADMIN_PASSWORD | cut -d= -f2)"
-SSO_TOKEN=$(curl -s -d "username=${KEYCLOAK_USER}&password=${KEYCLOAK_PASSWORD}&grant_type=password&client_id=admin-cli" \
-  -X POST http://keycloak-che.${HOSTNAME_SUFFIX}/auth/realms/master/protocol/openid-connect/token | \
-  jq  -r '.access_token')
+
+echo "Keycloak credentials: ${KEYCLOAK_USER} / ${KEYCLOAK_PASSWORD}"
+echo "URL: http://keycloak-codeready.${HOSTNAME_SUFFIX}"
+
+# Enable script upload
+oc set env -n codeready deployment/keycloak JAVA_OPTS_APPEND="-Dkeycloak.profile.feature.scripts=enabled -Dkeycloak.profile.feature.upload_scripts=enabled"
+
+# Wait for keycloak to return
+echo "Wait for keycloak to return"
+while [ true ] ; do
+  if [ "$(oc rollout -n codeready status --timeout=3m -w deployment/keycloak)" ] ; then
+    break
+  fi
+  echo -n .
+  sleep 10
+done
+
+# Get keycloak pod
+echo "Get keycloak pod"
+while [ true ] ; do
+  if [ "$(oc get pod -n codeready -l app=codeready,component=keycloak)" ] ; then
+    break
+  fi
+  echo -n .
+  sleep 10
+done
+
+echo -e "Waiting 60s for keycloak to be ready... \n"
+sleep 60
 
 # Import realm
-curl -v -H "Authorization: Bearer ${SSO_TOKEN}" -H "Content-Type:application/json" -d @${MYDIR}../files/quarkus-realm.json \
-  -X POST "http://keycloak-che.${HOSTNAME_SUFFIX}/auth/admin/realms"
-
-## MANUALLY add ProtocolMapper to map User Roles to "groups" prefix for JWT claims
-echo "Keycloak credentials: $KEYCLOAK_USER / $KEYCLOAK_PASSWORD"
-echo "URL: http://keycloak-che.${HOSTNAME_SUFFIX}"
+wget https://raw.githubusercontent.com/redhat-cop/agnosticd/development/ansible/roles/ocp4-workload-quarkus-workshop/files/quarkus-realm.json
+SSO_TOKEN=$(curl -s -d "username=${KEYCLOAK_USER}&password=${KEYCLOAK_PASSWORD}&grant_type=password&client_id=admin-cli" \
+  -X POST http://keycloak-codeready.$HOSTNAME_SUFFIX/auth/realms/master/protocol/openid-connect/token | \
+  jq  -r '.access_token')
+curl -v -H "Authorization: Bearer ${SSO_TOKEN}" -H "Content-Type:application/json" -d @quarkus-realm.json \
+  -X POST "http://keycloak-codeready.${HOSTNAME_SUFFIX}/auth/admin/realms"
+rm -f quarkus-realm.json
 
 # Create Che users, let them view che namespace
-for i in {1..$USERCOUNT} ; do
-    # oc adm policy add-role-to-user view user${i} -n che
+for i in $(eval echo "{1..$USERCOUNT}") ; do
+    SSO_TOKEN=$(curl -s -d "username=${KEYCLOAK_USER}&password=${KEYCLOAK_PASSWORD}&grant_type=password&client_id=admin-cli" \
+    -X POST http://keycloak-codeready.$HOSTNAME_SUFFIX/auth/realms/master/protocol/openid-connect/token | \
+    jq  -r '.access_token')
     USERNAME=user${i}
     FIRSTNAME=User${i}
     LASTNAME=Developer
-    curl -v -H "Authorization: Bearer ${SSO_TOKEN}" -H "Content-Type:application/json" -d '{"username":"user'${i}'","enabled":true,"emailVerified": true,"firstName": "User'${i}'","lastName": "Developer","email": "user'${i}'@no-reply.com", "credentials":[{"type":"password","value":"pass'${i}'","temporary":false}]}' -X POST "http://keycloak-che.${HOSTNAME_SUFFIX}/auth/admin/realms/codeready/users"
+    curl -v -H "Authorization: Bearer ${SSO_TOKEN}" -H "Content-Type:application/json" -d '{"username":"user'${i}'","enabled":true,"emailVerified": true,"firstName": "User'${i}'","lastName": "Developer","email": "user'${i}'@no-reply.com", "credentials":[{"type":"password","value":"'${CHE_USER_PASSWORD}'","temporary":false}]}' -X POST "http://keycloak-codeready.${HOSTNAME_SUFFIX}/auth/admin/realms/codeready/users"
 done
 
-# Import stack definition
-SSO_CHE_TOKEN=$(curl -s -d "username=admin&password=admin&grant_type=password&client_id=admin-cli" \
-  -X POST http://keycloak-che.${HOSTNAME_SUFFIX}/auth/realms/codeready/protocol/openid-connect/token | \
+# Get CRW SSO admin token
+SSO_TOKEN=$(curl -s -d "username=${KEYCLOAK_USER}&password=${KEYCLOAK_PASSWORD}&grant_type=password&client_id=admin-cli" \
+  -X POST http://keycloak-codeready.${HOSTNAME_SUFFIX}/auth/realms/master/protocol/openid-connect/token | \
   jq  -r '.access_token')
 
-curl -X POST --header 'Content-Type: application/json' --header 'Accept: application/json' \
-    --header "Authorization: Bearer ${SSO_CHE_TOKEN}" -d @${MYDIR}/../files/stack.json \
-    "http://codeready-che.${HOSTNAME_SUFFIX}/api/stack"
-
-# MANUALLY set permissions according to
-# https://access.redhat.com/documentation/en-us/red_hat_codeready_workspaces/1.2/html/administration_guide/administering_workspaces#stacks
-# THEN
+# Increase codeready access token lifespans
+curl -v -H "Authorization: Bearer ${SSO_TOKEN}" -H "Content-Type:application/json" -d '{"accessTokenLifespan": 28800,"accessTokenLifespanForImplicitFlow": 28800,"actionTokenGeneratedByUserLifespan": 28800,"ssoSessionIdleTimeout": 28800,"ssoSessionMaxLifespan": 28800}' \
+  -X PUT "http://keycloak-codeready.${HOSTNAME_SUFFIX}/auth/admin/realms/codeready"
 
 # Scale the cluster
 WORKERCOUNT=$(oc get nodes|grep worker | wc -l)
@@ -294,66 +273,52 @@ if [ "$WORKERCOUNT" -lt 10 ] ; then
     done
 fi
 
-# Adjust cpu limits to 500/1500
-# oc patch -n che limitrange/che-core-resource-limits -p '' --type=merge
-
 # import stack image
 oc create -n openshift -f $MYDIR/../files/stack.imagestream.yaml
 oc import-image --all quarkus-stack -n openshift
 
 # Pre-create workspaces for users
-for i in {1..$USERCOUNT} ; do
-    SSO_CHE_TOKEN=$(curl -s -d "username=user${i}&password=pass${i}&grant_type=password&client_id=admin-cli" \
-        -X POST http://keycloak-che.${HOSTNAME_SUFFIX}/auth/realms/codeready/protocol/openid-connect/token | jq  -r '.access_token')
+wget -O devfile.json https://raw.githubusercontent.com/redhat-cop/agnosticd/development/ansible/roles/ocp4-workload-quarkus-workshop/templates/devfile.json.j2 
+for i in $(eval echo "{1..$USERCOUNT}") ; do
+    SSO_CHE_TOKEN=$(curl -s -d "username=user${i}&password=${CHE_USER_PASSWORD}&grant_type=password&client_id=admin-cli" \
+        -X POST http://keycloak-codeready.${HOSTNAME_SUFFIX}/auth/realms/codeready/protocol/openid-connect/token | jq  -r '.access_token')  
 
     TMPWORK=$(mktemp)
-    sed 's/WORKSPACENAME/WORKSPACE'${i}'/g' $MYDIR/../files/workspace.json > $TMPWORK
+    sed 's/{{ user }}/user'${i}'/g' devfile.json > $TMPWORK
 
-    curl -X POST --header 'Content-Type: application/json' --header 'Accept: application/json' \
-    --header "Authorization: Bearer ${SSO_CHE_TOKEN}" -d @${TMPWORK} \
-    "http://codeready-che.${HOSTNAME_SUFFIX}/api/workspace?start-after-create=true&namespace=user${i}"
+    curl -v -X POST --header 'Content-Type: application/json' --header 'Accept: application/json' \
+    --header "Authorization: Bearer ${SSO_CHE_TOKEN}" -d @${TMPWORK}  \
+    "http://codeready-codeready.${HOSTNAME_SUFFIX}/api/workspace/devfile?start-after-create=true&namespace=user${i}"
     rm -f $TMPWORK
 done
+rm -f devfile.json
 
-
-# Install the strimzi operator for all namespaces
-cat <<EOF | oc apply -n openshift-marketplace -f -
-apiVersion: operators.coreos.com/v1
-kind: CatalogSourceConfig
-metadata:
-  finalizers:
-  - finalizer.catalogsourceconfigs.operators.coreos.com
-  name: installed-community-openshift-operators
-  namespace: openshift-marketplace
-spec:
-  csDisplayName: Community Operators
-  csPublisher: Community
-  packages: strimzi-kafka-operator
-  targetNamespace: openshift-operators
-EOF
-
+# Install the AMQ Streams operator for all namespaces
 cat <<EOF | oc apply -n openshift-operators -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
-  labels:
-    csc-owner-name: installed-community-openshift-operators
-    csc-owner-namespace: openshift-marketplace
-  name: strimzi-kafka-operator
+  name: amq-streams
   namespace: openshift-operators
 spec:
   channel: stable
   installPlanApproval: Automatic
-  name: strimzi-kafka-operator
-  source: installed-community-openshift-operators
-  sourceNamespace: openshift-operators
+  name: amq-streams
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
 EOF
 
-# Build stack
-# Put your credentials in rhsm.secret file to look like:
-# RH_USERNAME=your-username
-# RH_PASSWORD=your-password
-#
-# then:
-# DOCKER_BUILDKIT=1 docker build --progress=plain --secret id=rhsm,src=rhsm.secret -t docker.io/username/che-quarkus-workshop:latest -f stack.Dockerfile .
-# docker push docker.io/username/che-quarkus-workshop:1.0.0.CR1
+# Install Jaeger operator for all namespaces
+cat <<EOF | oc apply -n openshift-operators -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: jaeger-product
+  namespace: openshift-operators
+spec:
+  channel: stable
+  installPlanApproval: Automatic
+  name: jaeger-product
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+EOF
