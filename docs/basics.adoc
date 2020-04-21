@@ -33,6 +33,11 @@ Step through the prompts, using the following value for **Repository URL**:
 https://github.com/RedHatWorkshops/quarkus-workshop-labs
 ----
 
+[WARNING]
+====
+If you use *FireFox*, it may add extra whitespace when you paste the URL, and you'll get an error like _Git: fatal: I don't handle protocol 'https'_. In this case, just remove the whitespace before and after the URL before pressing kbd:[ENTER].
+====
+
 image::crw-clone-repo.png[crw,900]
 
 Next, select `/projects` in the drop-down menu for destination directory:
