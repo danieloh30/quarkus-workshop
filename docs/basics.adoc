@@ -5,7 +5,7 @@ In this step, you will create a straightforward application serving a `hello` en
 
 image::arch.png[arch,800]
 
-This IDE is based on Eclipse Che (which is in turn based on MicroSoft VS Code editor).
+This IDE is based on Eclipse Codeready Workspaces (which is in turn based on Microsoft® Visual Studio Code editor).
 
 You can see icons on the left for navigating between project explorer, search, version control (e.g. Git), debugging, and other plugins.  You’ll use these during the course of this workshop. Feel free to click on them and see what they do:
 

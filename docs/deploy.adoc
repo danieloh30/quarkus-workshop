@@ -175,4 +175,4 @@ At this point, the probes will be accessed periodically to ensure the app is hea
 
 == Congratulations!
 
-This step covered the deployment of a native Quarkus application on OpenShift. However, there is much more, and the integration with these cloud native platforms (through health checks, configuration management, and monitoring which we'll cover later) has been tailored to make Quarkus applications execution very smooth.
+This step covered the deployment of a native Quarkus application on OpenShift. However, there is much more, and the integration with these cloud native platforms (through health checks, configuration management, and monitoring which we'll cover in the full-day workshop) has been tailored to make Quarkus applications execution very smooth.

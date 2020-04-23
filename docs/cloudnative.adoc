@@ -1,11 +1,11 @@
 = Cloud Native
 :experimental:
 
-In this step we will package the application as a Linux Container image, and deploy it to Kubernetes, and add a few features common to cloud native apps that you as a developer will need to handle. We'll use OpenShift 4 as our deployment target, which is a distribution of Kubernetes from Red Hat.
+In this step we will package the application as a Linux Container image, deploy it to Kubernetes, and add a few features common to cloud native apps that you as a developer will need to handle. We'll use OpenShift 4 as our deployment target, which is a distribution of Kubernetes from Red Hat.
 
 == Health Probes
 
-Quarkus application developers can utilize the MicroProfile Health specification to write HTTP health probes for their applications. These endpoints by default provide basic data about the service however they all provide a way to customize the health data and add more meaningful information (e.g. database connection health, backoffice system availability, etc).
+Quarkus application developers can utilize the MicroProfile Health specification to write HTTP health probes for their applications. These endpoints by default provide basic data about the service however they also provide a way to customize the health data and add more meaningful information (e.g. database connection health, backoffice system availability, etc).
 
 [NOTE]
 ====
@@ -16,7 +16,7 @@ There are of course a category of issues that can't be resolved by restarting th
 
 Let's build a simple REST application endpoint exposes https://microprofile.io[MicroProfile^] Health checks at the `/health` endpoint according to the specification. It will also provide several other REST endpoints to allow us to dynamically query the health of our Quarkus application.
 
-We'll need to add a https://quarkus.io/extensions[Quarkus Extension^] to enable this feature in our app. Fortunately, adding a Quarkus extension is super easy. We'll cover extensions in more depth in other sections of this workshop but for now, open a Terminal and execute the following command to add the extension to our project's `pom.xml`:
+We'll need to add a https://quarkus.io/extensions[Quarkus Extension^] to enable this feature in our app. Fortunately, adding a Quarkus extension is super easy. We'll cover extensions in more depth in other sections of the full-day workshop but for now, open a Terminal and execute the following command to add the extension to our project's `pom.xml`:
 
 [source, sh, role="copypaste"]
 ----
@@ -65,7 +65,7 @@ This default health check will return success as long as the app is running - if
 
 === Add a probe
 
-We can now implement a _better_ Health Check using the MicroProfile APIs. Create a new Java class - `org.acme.people.health.SimpleHealthCheck` (hint: right-click on the `org.acme.people.health` package and select _New > File_ and name it `SimpleHealthCheck.java`). In this file, implement the health check (you can copy/paste this code):
+We can now implement a _better_ Health Check using the MicroProfile APIs. Create a new Java class - `org.acme.people.health.SimpleHealthCheck` (hint: right-click on the `org.acme.people.health` package and select _New File_ and name it `SimpleHealthCheck.java`). In this file, implement the health check (you can copy/paste this code):
 
 [source, java, role="copypaste"]
 ----

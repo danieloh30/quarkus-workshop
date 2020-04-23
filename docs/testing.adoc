@@ -113,9 +113,9 @@ You will also get a pop-up letting you know CodeReady detected the app opened a 
 
 == Injecting a URI
 
-It is also possible to directly inject the URL into the test which can make is easy to use a different client. This is done via the `@TestHTTPResource` annotation.
+It is also possible to directly inject the URI into the test which can make is easy to use a different client. This is done via the `@TestHTTPResource` annotation.
 
-Let’s write a simple test that shows this off to load some static resources. First create a simple HTML file in `src/main/resources/META-INF/resources/`. Right-click on this directory and select _New -> File_. Name the file `test.html` in the dialog box:
+Let’s write a simple test that shows this off to load some static resources. First create a simple HTML file in `src/main/resources/META-INF/resources/`. Right-click on this directory and select _New File_. Name the file `test.html` in the dialog box:
 
 image::createhtml.png[html,700]
 image::createhtml2.png[html,500]
