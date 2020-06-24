@@ -35,14 +35,6 @@ https://github.com/RedHat-Middleware-Workshops/quarkus-workshop-labs
 
 image::crw-clone-repo.png[crw,900]
 
-Next, select `/projects` in the drop-down menu for destination directory:
-
-image::crw-clone-dest.png[crw,900]
-
-And click *Select Repository Location*.
-
-Once imported, choose **Add to workspace** when prompted.
-
 The project is imported into your workspace and is visible in the project explorer (click on the top-most icon for project explorer):
 
 image::crw-clone-explorer.png[crw,900]
@@ -54,6 +46,15 @@ terminal, you can use the **>_ New Terminal** command on the right:
 
 image::cmd-terminal.png[codeready-workspace-terminal, 500]
 ====
+
+==== IMPORTANT: Check out proper Git branch
+
+To make sure you're using the right version of the project files, run this command in a CodeReady Terminal:
+
+[source,sh,role="copypaste"]
+----
+cd $CHE_PROJECTS_ROOT/quarkus-workshop-labs && git checkout ocp-4.4
+----
 
 The project has
 

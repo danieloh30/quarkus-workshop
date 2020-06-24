@@ -39,6 +39,11 @@ Using project "{{ USER_ID }}-project".
 Welcome! See 'oc help' to get started.
 ----
 
+[NOTE]
+====
+After you log in using *Login to OpenShift*, the terminal is no longer usable as a regular terminal. You can close the terminal window. You will still be logged in when you open more terminals later!
+====
+
 Congratulations, you are now authenticated to the OpenShift server via the CLI. We'll use the prettier web console later on in this lab.
 
 [WARNING]
@@ -66,7 +71,7 @@ You should get a `--> Success` message at the end.
 
 [NOTE]
 ====
-This build uses the new https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux_atomic_host/7/html/getting_started_with_containers/using_red_hat_base_container_images_standard_and_minimal[Red Hat Universal Base Image^], providing foundational software needed to run most applications, while staying at a reasonable size.
+This build uses the new https://developers.redhat.com/products/rhel/ubi/[Red Hat Universal Base Image^], providing foundational software needed to run most applications, while staying at a reasonable size.
 ====
 
 And then start and watch the build, which will take about a minute to complete:
