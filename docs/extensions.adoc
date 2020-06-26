@@ -227,13 +227,13 @@ This will also listen for a debugger on port `5005`. If you want to wait for the
 sh $CHE_PROJECTS_ROOT/quarkus-workshop-labs/scripts/deploy-people.sh {{ USER_ID }}
 ----
 
-Ready? Let's learn how easily Quarkus allows developers to extend for building a vibrant ecosystem.
+== List extensions
+
+Ready to dive into *advanced* Quarkus development? Let's learn how easily Quarkus allows developers to extend for building a vibrant ecosystem.
 
 Think of Quarkus extensions as your project dependencies. Extensions configure, boot and integrate a framework or technology into your Quarkus application. They also do all of the heavy lifting of providing the right information to GraalVM for your application to compile natively.
 
 Quarkus aims to provide a support for a full https://quarkus.io/extensions/[extension ecosystem^], to make it easy to discover and consume 3rd party extensions, as well as providing easier version management.
-
-== List extensions
 
 Retrieve the list of possible extensions using the Maven plugin. Run this in the Terminal:
 
